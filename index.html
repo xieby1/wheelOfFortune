@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Wheel of Fortune Bingo</title>
+    
+<!--
+    
+MIT License
+
+Copyright (c) 2017 Jeremy Rue
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+
+<!--
+courtesy to https://gist.github.com/jrue/a2aaf36b3c096925ccbf
+-->
+
+    <style type="text/css">
+    text{
+        font-family:Helvetica, Arial, sans-serif;
+        font-size:11px;
+        pointer-events:none;
+    }
+    #chart{
+        position:absolute;
+        top:0;
+        left:0;
+    }
+    #question{
+        position: absolute;
+        left:0;
+    }
+    #question h1{
+        font-size: 50px;
+        font-weight: bold;
+        font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        position: relative;
+        padding: 0;
+        margin: 0;
+        top:38%;
+        text-align: center;
+        -webkit-transform:translate(0,-50%);
+                transform:translate(0,-50%);
+    }
+    </style>
+    
+</head>
+<body>
+    <div id="chart"></div>
+    <br/>
+    <div id="question"><h1></h1></div>
+    
+    <script src="https://d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script type="text/javascript" charset="utf-8">
+        var vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0),
+            vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0),
+            vlen = Math.min(vw, vh),
+            padding = {top:0.05*vlen, right:0.05*vlen, bottom:0.05*vlen, left:0.05*vlen},
+            w = vlen - padding.left - padding.right,
+            h = vlen - padding.top  - padding.bottom,
+            r = Math.min(w, h)/2,
+            rotation = 0,
+            oldrotation = 0,
+            picked = 100000,
+            oldpick = [],
+            color = d3.scale.category20();//category20c()
+            //randomNumbers = getRandomNumbers();
+
+        // set chart and question area
+        dom_chart = document.getElementById("chart").style.width = 0.9 * vlen + "px";
+        dom_chart = document.getElementById("chart").style.height = 0.9 * vlen + "px";
+            
+        dom_chart = document.getElementById("question").style.width = 0.9 * vlen + "px";
+        dom_chart = document.getElementById("question").style.height = 0.9 * vlen + "px";
+        dom_chart = document.getElementById("question").style.top = 0.95 * vlen + "px";
+
+        var data = [
+                    {"label":"散步",  "value":1,  "question":"出门散步，开开直播一起看看风景吧"},
+                    {"label":"美食",  "value":1,  "question":"去买零食，嘎滋噶滋的吃吧"},
+                    {"label":"电影",  "value":1,  "question":"在网上找一部好看的电影，然后有空一起看吧"},
+                    {"label":"打滚",  "value":1,  "question":"在床上打滚，和枕头一起玩耍"},
+                    {"label":"诗词",  "value":1,  "question":"找一首和周围事物相关的诗词，并朗读"},
+                    {"label":"愿望",  "value":1,  "question":"较劲脑汁思考如何使用一个小愿望，并使用它"},
+                    {"label":"视频",  "value":1,  "question":"上网看欢乐视频，不哈哈大笑，就别停下吧"},
+                    {"label":"公交",  "value":1,  "question":"随便去最近的一个公交站，看人流、车流穿梭"},
+                    {"label":"游戏",  "value":1,  "question":"和对方一起玩一个在线小游戏"},
+                    {"label":"健身",  "value":1,  "question":"俯卧撑、仰卧起坐、慢跑、健身环，总有一个适合你"},
+                    {"label":"购物",  "value":1,  "question":"去超市买喜欢的小玩意吧，不要太贵，钱包泪"},
+                    {"label":"穿着",  "value":1,  "question":"穿着对方的衣服，出去闲逛一会吧，会不会成为焦点呢"},
+                    {"label":"书画",  "value":1,  "question":"随便找张纸，找纸笔，开始涂鸦吧"},
+                    {"label":"闲聊",  "value":1,  "question":"找个靠谱又闲着的人，闲聊吧"},
+                    {"label":"幻想",  "value":1,  "question":"在脑子里幻想一个传奇、一个童话、一个xx吧，能写下来也不错"},
+                    {"label":"跳舞",  "value":1,  "question":"把疲惫的身体，动起来，随便扭扭应该也算是跳舞吧"},
+        ];
+
+
+        var svg = d3.select('#chart')
+            .append("svg")
+            .data([data])
+            .attr("width",  w + padding.left + padding.right)
+            .attr("height", h + padding.top + padding.bottom);
+
+        var container = svg.append("g")
+            .attr("class", "chartholder")
+            .attr("transform", "translate(" + (w/2 + padding.left) + "," + (h/2 + padding.top) + ")");
+
+        var vis = container
+            .append("g");
+            
+        var pie = d3.layout.pie().sort(null).value(function(d){return 1;});
+
+        // declare an arc generator function
+        var arc = d3.svg.arc().outerRadius(r);
+
+        // select paths, use arc generator to draw
+        var arcs = vis.selectAll("g.slice")
+            .data(pie)
+            .enter()
+            .append("g")
+            .attr("class", "slice");
+            
+
+        arcs.append("path")
+            .attr("fill", function(d, i){ return color(i); })
+            .attr("d", function (d) { return arc(d); });
+
+        // add the text
+        arcs.append("text").attr("transform", function(d){
+                d.innerRadius = 0;
+                d.outerRadius = r;
+                d.angle = (d.startAngle + d.endAngle)/2;
+                return "rotate(" + (d.angle * 180 / Math.PI - 90) + ")translate(" + (d.outerRadius -10) +")";
+            })
+            .attr("text-anchor", "end")
+            .attr("style", "font-size: " + 0.1 * r + "px")
+            .text( function(d, i) {
+                return data[i].label;
+            });
+
+        container.on("click", spin);
+
+
+        function spin(d){
+            
+            container.on("click", null);
+
+            //all slices have been seen, all done
+            console.log("OldPick: " + oldpick.length, "Data length: " + data.length);
+            if(oldpick.length == data.length){
+                console.log("done");
+                container.on("click", null);
+                return;
+            }
+
+            var  ps       = 360/data.length,
+                 pieslice = Math.round(1440/data.length),
+                 rng      = Math.floor((Math.random() * 1440) + 360);
+                
+            rotation = (Math.round(rng / ps) * ps);
+            
+            picked = Math.round(data.length - (rotation % 360)/ps);
+            picked = picked >= data.length ? (picked % data.length) : picked;
+
+
+            if(oldpick.indexOf(picked) !== -1){
+                d3.select(this).call(spin);
+                return;
+            } else {
+                oldpick.push(picked);
+            }
+
+            rotation += 90 - Math.round(ps/2);
+
+            vis.transition()
+                .duration(3000)
+                .attrTween("transform", rotTween)
+                .each("end", function(){
+
+                    //mark question as seen
+                    d3.select(".slice:nth-child(" + (picked + 1) + ") path")
+                        .attr("fill", "#111");
+
+                    //populate question
+                    d3.select("#question h1")
+                        .text(data[picked].question);
+
+                    oldrotation = rotation;
+                
+                    container.on("click", spin);
+                });
+        }
+
+        //make arrow
+        svg.append("g")
+            .attr("transform", "translate(" + (w + padding.left + padding.right) + "," + ((h/2)+padding.top) + ")")
+            .append("path")
+            .attr("d", "M-" + (r*.15) + ",0L0," + (r*.05) + "L0,-" + (r*.05) + "Z")
+            .style({"fill":"black"});
+
+        //draw spin circle
+        container.append("circle")
+            .attr("cx", 0)
+            .attr("cy", 0)
+            .attr("r", 0.15*r)
+            .style({"fill":"white","cursor":"pointer"});
+
+        //spin text
+        container.append("text")
+            .attr("x", 0)
+            .attr("y", 15)
+            .attr("text-anchor", "middle")
+            .text("转")
+            .style({"font-weight":"bold", "font-size":0.15*r + "px"});
+        
+        
+        function rotTween(to) {
+          var i = d3.interpolate(oldrotation % 360, rotation);
+          return function(t) {
+            return "rotate(" + i(t) + ")";
+          };
+        }
+        
+        
+        function getRandomNumbers(){
+            var array = new Uint16Array(1000);
+            var scale = d3.scale.linear().range([360, 1440]).domain([0, 100000]);
+
+            if(window.hasOwnProperty("crypto") && typeof window.crypto.getRandomValues === "function"){
+                window.crypto.getRandomValues(array);
+                console.log("works");
+            } else {
+                //no support for crypto, get crappy random numbers
+                for(var i=0; i < 1000; i++){
+                    array[i] = Math.floor(Math.random() * 100000) + 1;
+                }
+            }
+
+            return array;
+        }
+
+    </script>
+</body>
+</html>
